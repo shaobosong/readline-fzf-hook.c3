@@ -9,10 +9,14 @@ Enhanced Readline with fzf-powered hooks
 - make
 
 # Build
+```sh
 make all
+```
 
 # Usage
+```sh
 LD_PRELOAD=/your/path/liberl.so prog
+```
 
 # Limitations
 - Dynamically linked libreadline
