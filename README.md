@@ -7,6 +7,7 @@ Enhanced Readline with fzf-powered hooks
 # Requirements
 - [c3c](https://github.com/c3lang/c3c)(v0.7.2)
 - make
+- fzf
 
 # Build
 ```sh
