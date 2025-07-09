@@ -1,26 +1,26 @@
 # liberl.c3
 Enhanced Readline with fzf-powered hooks
 
-# Features
+## Features
 - Tab Completion(`Tab`)
 
-# Requirements
+## Requirements
 - [c3c](https://github.com/c3lang/c3c)(v0.7.2)
 - make
 - fzf
 
-# Build
+## Build
 ```sh
 make all
 ```
 
-# Usage
+## Usage
 ```sh
 LD_PRELOAD=/your/path/liberl.so prog
 ```
 
-# Limitations
+## Limitations
 - Dynamically linked libreadline
 
-# License
+## License
 MIT
