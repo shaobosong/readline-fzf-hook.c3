@@ -45,7 +45,7 @@ Rl_insert_text_func_t original_rl_insert_text = null;
 
 char* rl_line_buffer_val = null;
 int* rl_point_ptr = null;
-int rl_end_val;
+int* rl_end_ptr = null;
 
 /* Completion */
 alias Rl_completion_func_t = fn char**(char*, int, int);
@@ -359,17 +359,20 @@ fn void resolve_search_history_variable_symbols()
     void* handle = libc_dlopen(null, GNUC_RTLD_LAZY | GNUC_RTLD_GLOBAL);
 
     rl_line_buffer_val = @resolve_data_sym_val(handle, rl_line_buffer, char*, null);
-    rl_end_val = @resolve_data_sym_val(handle, rl_end, int, 0);
+    rl_end_ptr = @resolve_data_sym_ptr(handle, rl_end);
     rl_point_ptr = @resolve_data_sym_ptr(handle, rl_point);
 
     libc_dlclose(handle);
 }
 
-fn void update_readline_text(String text)
+fn void update_readline_text(String new_text)
 {
-    original_rl_delete_text(0, rl_end_val);
-    *rl_point_ptr = rl_end_val;
-    original_rl_insert_text(text.zstr_tcopy());
+    String old_text = (String)rl_line_buffer_val[:cstring_strlen(rl_line_buffer_val)];
+    if (cmp_string(new_text, old_text) != 0) {
+        original_rl_delete_text(0, *rl_end_ptr);
+        *rl_point_ptr = *rl_end_ptr;
+        original_rl_insert_text(new_text.zstr_tcopy());
+    }
 }
 
 fn int rl_reverse_search_history (int sign, int key) @export("rl_reverse_search_history")
@@ -401,8 +404,13 @@ fn int rl_reverse_search_history (int sign, int key) @export("rl_reverse_search_
         return 0;
     }
 
-    update_readline_text(selected);
     original_rl_redraw_prompt_last_line();
+
+    if (selected.len == 0) {
+        return 0;
+    }
+
+    update_readline_text(selected);
 
     return 0;
 }
