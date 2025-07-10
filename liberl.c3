@@ -40,9 +40,14 @@ alias Rl_compentry_func_t = fn char*(char*, int);
 
 Rl_command_func_t original_rl_complete = null;
 Rl_redraw_func_t original_rl_redraw_prompt_last_line = null;
-Rl_completion_func_t original_rl_attempted_completion_function = null;
-Rl_compentry_func_t original_rl_completion_entry_function = null;
-char* original_rl_line_buffer = null;
+
+Rl_completion_func_t* rl_attempted_completion_function_ptr = null;
+Rl_completion_func_t rl_attempted_completion_function_val = null;
+Rl_compentry_func_t* rl_completion_entry_function_ptr = null;
+Rl_compentry_func_t rl_completion_entry_function_val = null;
+char* rl_line_buffer_val = null;
+int* rl_attempted_completion_over_ptr = null;
+int rl_attempted_completion_over_val = 0;
 
 macro usz cstring_strlen(ptr) @private
 {
@@ -160,7 +165,7 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
     ListStr choices;
 
     // We first invoke the original callback function
-    cmatches = original_rl_attempted_completion_function(ctext, start, end);
+    cmatches = rl_attempted_completion_function_val(ctext, start, end);
     if (!cmatches) {
         return null;
     }
@@ -188,7 +193,7 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
 
     // Now FZF takes over and handles the matches
     // Get the line text in line editor
-    line_text = (String)original_rl_line_buffer[:cstring_strlen(original_rl_line_buffer)];
+    line_text = (String)rl_line_buffer_val[:cstring_strlen(rl_line_buffer_val)];
 
     // Get index of the field under completion in the space-separated string
     nth = line_text[0:start].count(" ") + 1;
@@ -230,7 +235,7 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
     return c_new_single_match_list(selected);
 }
 
-fn char *fzf_completion_entry_function(char *text, int state)
+fn char *fzf_completion_entry_callback(char *text, int state)
 {
     return null;
 }
@@ -242,25 +247,15 @@ macro @resolve_text_sym(#orig, #sym)
     }
 }
 
-macro @resolve_data_sym(#handle, #orig, #sym)
+macro @resolve_data_sym_ptr(#handle, #sym)
 {
-    if (!#orig) {
-        $typeof(#orig) *ptr = libc_dlsym(#handle, $stringify(#sym));
-        if (ptr) {
-            #orig = *ptr;
-        }
-    }
+    return libc_dlsym(#handle, $stringify(#sym));
 }
 
-macro @resolve_data_sym_assign(#handle, #orig, #sym, #new)
+macro @resolve_data_sym_val(#handle, #sym, $Type, #failval)
 {
-    if (!#orig) {
-        $typeof(#orig) *ptr = libc_dlsym(#handle, $stringify(#sym));
-        if (ptr) {
-            #orig = *ptr;
-            *ptr = &#new;
-        }
-    }
+    $Type* ptr = libc_dlsym(#handle, $stringify(#sym));
+    return ptr ? *ptr : #failval;
 }
 
 fn void resolve_function_symbols()
@@ -272,16 +267,41 @@ fn void resolve_function_symbols()
 fn void resolve_variable_symbols()
 {
     void* handle = libc_dlopen(null, GNUC_RTLD_LAZY | GNUC_RTLD_GLOBAL);
-    @resolve_data_sym_assign(handle, original_rl_attempted_completion_function, rl_attempted_completion_function, fzf_attempted_completion_callback);
-    @resolve_data_sym_assign(handle, original_rl_completion_entry_function, rl_completion_entry_function, fzf_completion_entry_function);
-    @resolve_data_sym(handle, original_rl_line_buffer, rl_line_buffer);
+
+    rl_attempted_completion_function_ptr = @resolve_data_sym_ptr(handle, rl_attempted_completion_function);
+    if (rl_attempted_completion_function_ptr) {
+        rl_attempted_completion_function_val = *rl_attempted_completion_function_ptr;
+        *rl_attempted_completion_function_ptr = &fzf_attempted_completion_callback;
+    }
+
+    rl_attempted_completion_over_ptr = @resolve_data_sym_ptr(handle, rl_attempted_completion_over);
+    if (rl_attempted_completion_over_ptr) {
+        rl_attempted_completion_over_val = *rl_attempted_completion_over_ptr;
+    }
+
+    rl_completion_entry_function_ptr = @resolve_data_sym_ptr(handle, rl_completion_entry_function);
+    if (rl_completion_entry_function_ptr) {
+        rl_completion_entry_function_val = *rl_completion_entry_function_ptr;
+        *rl_completion_entry_function_ptr = &fzf_completion_entry_callback;
+    }
+
+    rl_line_buffer_val = @resolve_data_sym_val(handle, rl_line_buffer, char*, null);
+
     libc_dlclose(handle);
+}
+
+fn void restore_variable_symbols()
+{
+    *rl_attempted_completion_function_ptr = rl_attempted_completion_function_val;
+    // *rl_attempted_completion_over_ptr = rl_attempted_completion_over_val;
+    *rl_completion_entry_function_ptr = rl_completion_entry_function_val;
 }
 
 fn int rl_complete(int ignore, int invoking_key) @export("rl_complete")
 {
     resolve_function_symbols();
     resolve_variable_symbols();
+    defer restore_variable_symbols();
 
     /* Complete the word at or before point.
        WHAT_TO_DO says what to do with the completion.
