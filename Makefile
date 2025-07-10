@@ -1,5 +1,5 @@
 all:
-	c3c dynamic-lib ./liberl.c3
+	c3c dynamic-lib ./readline_fzf_hook.c3
 
 clean:
-	rm -rf .build liberl.so
+	rm -rf .build readline_fzf_hook.so

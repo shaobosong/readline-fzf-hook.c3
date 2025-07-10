@@ -1,4 +1,4 @@
-# liberl.c3
+# readline-fzf-hook.c3
 Enhanced Readline with fzf-powered hooks
 
 ## Features
@@ -16,7 +16,7 @@ make all
 
 ## Usage
 ```sh
-LD_PRELOAD=/your/path/liberl.so prog
+LD_PRELOAD=/your/path/readline_fzf_hook.so your_program
 ```
 
 ## Limitations

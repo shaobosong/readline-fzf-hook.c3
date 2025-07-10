@@ -1,4 +1,4 @@
-module liberl;
+module readline_fzf_hook;
 
 import std::collections;
 import std::io;
