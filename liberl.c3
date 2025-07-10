@@ -229,6 +229,10 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
 
     // Avoid to trigger original behaviour if we do nothing
     if (selected.len == 0) {
+        // To suppress normal filename completion
+        if (rl_attempted_completion_over_ptr) {
+            *rl_attempted_completion_over_ptr = 1;
+        }
         return null;
     }
 
@@ -279,11 +283,11 @@ fn void resolve_variable_symbols()
         rl_attempted_completion_over_val = *rl_attempted_completion_over_ptr;
     }
 
-    rl_completion_entry_function_ptr = @resolve_data_sym_ptr(handle, rl_completion_entry_function);
-    if (rl_completion_entry_function_ptr) {
-        rl_completion_entry_function_val = *rl_completion_entry_function_ptr;
-        *rl_completion_entry_function_ptr = &fzf_completion_entry_callback;
-    }
+    // rl_completion_entry_function_ptr = @resolve_data_sym_ptr(handle, rl_completion_entry_function);
+    // if (rl_completion_entry_function_ptr) {
+    //     rl_completion_entry_function_val = *rl_completion_entry_function_ptr;
+    //     *rl_completion_entry_function_ptr = &fzf_completion_entry_callback;
+    // }
 
     rl_line_buffer_val = @resolve_data_sym_val(handle, rl_line_buffer, char*, null);
 
@@ -294,7 +298,7 @@ fn void restore_variable_symbols()
 {
     *rl_attempted_completion_function_ptr = rl_attempted_completion_function_val;
     // *rl_attempted_completion_over_ptr = rl_attempted_completion_over_val;
-    *rl_completion_entry_function_ptr = rl_completion_entry_function_val;
+    // *rl_completion_entry_function_ptr = rl_completion_entry_function_val;
 }
 
 fn int rl_complete(int ignore, int invoking_key) @export("rl_complete")
