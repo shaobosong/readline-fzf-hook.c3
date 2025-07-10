@@ -163,6 +163,7 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
     String common_prefix;
     ListStr extra_fzf_args;
     ListStr choices;
+    usz new_end;
 
     // We first invoke the original callback function
     cmatches = rl_attempted_completion_function_val(ctext, start, end);
@@ -207,9 +208,10 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
         extra_fzf_args.push(string::tformat("--with-nth={%d}", nth));
     }
 
-    // Ignore first match
+    // Ignore first match, and concat a new choice
+    new_end = line_text.index_of_char_from(' ', end) ?? line_text.len;
     foreach (String m : matches[1..]) {
-        String choice = line_text[0:start].tcopy().tconcat(m).tconcat(line_text[end..].tcopy());
+        String choice = line_text[0:start].tcopy().tconcat(m).tconcat(line_text[new_end..].tcopy());
         if (!choices.contains(choice)) {
             choices.push(choice);
         }
