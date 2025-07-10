@@ -3,6 +3,7 @@ Enhanced Readline with fzf-powered hooks
 
 ## Features
 - Tab Completion(`Tab`)
+- Search history(`C-r`)
 
 ## Requirements
 - [c3c](https://github.com/c3lang/c3c)(v0.7.2)

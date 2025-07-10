@@ -33,21 +33,44 @@ extern fn void* libc_dlopen(CChar*, CInt) @extern("dlopen");
 extern fn CInt libc_dlclose(void*) @extern("dlclose");
 extern fn void* libc_dlsym(void*, CChar*) @extern("dlsym");
 
+/* Common */
 alias Rl_command_func_t = fn int(int, int);
 alias Rl_redraw_func_t = fn void();
+alias Rl_delete_text_func_t = fn int(int, int);
+alias Rl_insert_text_func_t = fn int(char*);
+
+Rl_redraw_func_t original_rl_redraw_prompt_last_line = null;
+Rl_delete_text_func_t original_rl_delete_text = null;
+Rl_insert_text_func_t original_rl_insert_text = null;
+
+char* rl_line_buffer_val = null;
+int* rl_point_ptr = null;
+int rl_end_val;
+
+/* Completion */
 alias Rl_completion_func_t = fn char**(char*, int, int);
 alias Rl_compentry_func_t = fn char*(char*, int);
 
 Rl_command_func_t original_rl_complete = null;
-Rl_redraw_func_t original_rl_redraw_prompt_last_line = null;
 
 Rl_completion_func_t* rl_attempted_completion_function_ptr = null;
 Rl_completion_func_t rl_attempted_completion_function_val = null;
-Rl_compentry_func_t* rl_completion_entry_function_ptr = null;
-Rl_compentry_func_t rl_completion_entry_function_val = null;
-char* rl_line_buffer_val = null;
 int* rl_attempted_completion_over_ptr = null;
 int rl_attempted_completion_over_val = 0;
+// Rl_compentry_func_t* rl_completion_entry_function_ptr = null;
+// Rl_compentry_func_t rl_completion_entry_function_val = null;
+
+/* Search history */
+struct Hist_entry {
+  char* line;
+  char* timestamp;
+  void* data;
+}
+
+alias History_list_func_t = fn Hist_entry**();
+
+History_list_func_t original_history_list = null;
+
 
 macro usz cstring_strlen(ptr) @private
 {
@@ -264,13 +287,13 @@ macro @resolve_data_sym_val(#handle, #sym, $Type, #failval)
     return ptr ? *ptr : #failval;
 }
 
-fn void resolve_function_symbols()
+fn void resolve_completion_function_symbols()
 {
     @resolve_text_sym(original_rl_complete, rl_complete);
     @resolve_text_sym(original_rl_redraw_prompt_last_line, rl_redraw_prompt_last_line);
 }
 
-fn void resolve_variable_symbols()
+fn void resolve_completion_variable_symbols()
 {
     void* handle = libc_dlopen(null, GNUC_RTLD_LAZY | GNUC_RTLD_GLOBAL);
 
@@ -296,7 +319,7 @@ fn void resolve_variable_symbols()
     libc_dlclose(handle);
 }
 
-fn void restore_variable_symbols()
+fn void restore_completion_variable_symbols()
 {
     *rl_attempted_completion_function_ptr = rl_attempted_completion_function_val;
     // *rl_attempted_completion_over_ptr = rl_attempted_completion_over_val;
@@ -305,9 +328,9 @@ fn void restore_variable_symbols()
 
 fn int rl_complete(int ignore, int invoking_key) @export("rl_complete")
 {
-    resolve_function_symbols();
-    resolve_variable_symbols();
-    defer restore_variable_symbols();
+    resolve_completion_function_symbols();
+    resolve_completion_variable_symbols();
+    defer restore_completion_variable_symbols();
 
     /* Complete the word at or before point.
        WHAT_TO_DO says what to do with the completion.
@@ -321,4 +344,65 @@ fn int rl_complete(int ignore, int invoking_key) @export("rl_complete")
        `$' implements a protocol for exporting completions and information about
        what is being completed to another process via rl_outstream. */
     return original_rl_complete ? original_rl_complete(ignore, invoking_key) : 0;
+}
+
+fn void resolve_search_history_function_symbols()
+{
+    @resolve_text_sym(original_history_list, history_list);
+    @resolve_text_sym(original_rl_delete_text, rl_delete_text);
+    @resolve_text_sym(original_rl_insert_text, rl_insert_text);
+    @resolve_text_sym(original_rl_redraw_prompt_last_line, rl_redraw_prompt_last_line);
+}
+
+fn void resolve_search_history_variable_symbols()
+{
+    void* handle = libc_dlopen(null, GNUC_RTLD_LAZY | GNUC_RTLD_GLOBAL);
+
+    rl_line_buffer_val = @resolve_data_sym_val(handle, rl_line_buffer, char*, null);
+    rl_end_val = @resolve_data_sym_val(handle, rl_end, int, 0);
+    rl_point_ptr = @resolve_data_sym_ptr(handle, rl_point);
+
+    libc_dlclose(handle);
+}
+
+fn void update_readline_text(String text)
+{
+    original_rl_delete_text(0, rl_end_val);
+    *rl_point_ptr = rl_end_val;
+    original_rl_insert_text(text.zstr_tcopy());
+}
+
+fn int rl_reverse_search_history (int sign, int key) @export("rl_reverse_search_history")
+{
+    int i;
+    Hist_entry** hlist;
+    ListStr choices;
+    String line_text;
+    String? selected;
+
+    resolve_search_history_function_symbols();
+    resolve_search_history_variable_symbols();
+
+    line_text = (String)rl_line_buffer_val[:cstring_strlen(rl_line_buffer_val)];
+
+    hlist = original_history_list();
+    for (i = 0; hlist[i]; i++);
+    for (i--; i >= 0; i--) {
+        char* line = hlist[i].line;
+        String choice = ((String)line[:cstring_strlen(line)]).trim();
+        if (!choices.contains(choice)) {
+            choices.push(choice);
+        }
+    }
+
+    selected = get_fzf_result({}, choices.to_tarray(), line_text);
+    if (catch excuse = selected) {
+        io::printfn("Error: %s", excuse);
+        return 0;
+    }
+
+    update_readline_text(selected);
+    original_rl_redraw_prompt_last_line();
+
+    return 0;
 }
