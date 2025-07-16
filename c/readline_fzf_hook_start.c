@@ -1,9 +1,15 @@
+#include <assert.h>
 #include <stddef.h>
 #include <sys/syscall.h>
 #include <sys/mman.h>
-#include <assert.h>
+#include <unistd.h>
 
 #define hidden __attribute__((__visibility__("hidden")))
+
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
+#define LD_PRELOAD_PREFIX "LD_PRELOAD="
 
 #define START "readline_fzf_hook_start"
 #include "entry_arch.h"
@@ -13,6 +19,10 @@ hidden void __exit(int status)
 {
     do_syscall_1(__NR_exit, status);
     assert(0);
+}
+
+hidden long _getcwd(char *buf, unsigned long size) {
+    return do_syscall_2(__NR_getcwd, (long)buf, size);
 }
 
 hidden void *_mmap(size_t length)
@@ -58,7 +68,24 @@ hidden char *strchrnul_custom(const char *s, char c) {
     while (*s && *s != c) {
         s++;
     }
-    return (char *)s;
+    return (void *)s;
+}
+
+hidden char *strchr_custom(const char *s, char c) {
+    while (*s && *s != c) {
+        s++;
+    }
+    return *s == c ? (void *)s : 0;
+}
+
+hidden char *strrchr_custom(const char *s, char c) {
+    size_t n = strlen_custom(s) + 1;
+    while (n--) {
+        if (s[n] == c) {
+            return (void *)(s + n);
+        }
+    }
+    return 0;
 }
 
 hidden int str_starts_with(const char *str, const char *prefix) {
@@ -74,7 +101,85 @@ hidden void print_error(const char *msg) {
     }
 }
 
-#define LD_PRELOAD_PREFIX "LD_PRELOAD="
+hidden char *get_real_path(const char *path, char *real_path)
+{
+    char *rp1, *rp2;
+    const char *p1, *p2;
+    char buf[PATH_MAX];
+    int n;
+
+    if (path == NULL) {
+        return NULL;
+    } else {
+        p1 = p2 = path;
+    }
+
+    if (real_path == NULL) {
+        rp1 = rp2 = buf;
+    } else {
+        rp1 = rp2 = real_path;
+    }
+
+    if (*p1 == '/') {
+        p1++;
+        p2++;
+        rp2[0] = '/';
+        rp2[1] = 0;
+    } else {
+        if (_getcwd(rp2, PATH_MAX) <= 0) {
+            return NULL;
+        }
+        rp2 += strlen_custom(rp2);
+    }
+
+    while (*p2) {
+        p2 = strchr_custom(p1, '/');
+        if (!p2) {
+            p2 = strchr_custom(p1, 0);
+        }
+        switch (p2 - p1) {
+        case 0:
+            break;
+        case 1:
+            if (p1[0] == '.') {
+                break;
+            }
+        case 2:
+            if (p1[0] == '.' && p1[1] == '.') {
+                rp2 = strrchr_custom(rp1, '/');
+                if (rp2 != rp1) {
+                    rp2[0] = 0;
+                } else {
+                    rp2[1] = 0;
+                }
+                break;
+            }
+        default:
+            *rp2 = '/';
+            rp2++;
+            memcpy_custom(rp2, p1, p2 - p1);
+            rp2 += p2 - p1;
+            break;
+        }
+        p1 = p2 + 1;
+    };
+
+    if (rp2 == rp1) {
+        rp2++;
+    }
+    *rp2 = 0;
+
+    if (real_path == NULL) {
+        n = rp2 - rp1 + 1;
+        rp1 = _mmap(n);
+        if (rp1 == NULL) {
+            return NULL;
+        }
+        memcpy_custom(rp1, buf, n);
+    }
+
+    return rp1;
+}
 
 hidden void readline_fzf_hook_start_c(size_t *sp, size_t *dynv)
 {
@@ -84,7 +189,7 @@ hidden void readline_fzf_hook_start_c(size_t *sp, size_t *dynv)
     char **e;
     int env_count;
     const char *path_env;
-    char *libso = argv[0];
+    char *libso;
     size_t prefix_len;
     size_t libso_len;
     size_t prefix_libso_len;
@@ -99,7 +204,9 @@ hidden void readline_fzf_hook_start_c(size_t *sp, size_t *dynv)
     char *target_path_prog;
 
     if (argc < 2) {
-        print_error("Usage: ./readline_fzf_hook.so <program> [args...]\n");
+        print_error("Usage: ");
+        print_error(argv[0]);
+        print_error(" <program> [args...]\n");
         __exit(1);
     }
 
@@ -108,6 +215,16 @@ hidden void readline_fzf_hook_start_c(size_t *sp, size_t *dynv)
         if (str_starts_with(*e, "PATH=")) {
             path_env = *e + 5;
         }
+    }
+
+    if (*argv[0] != '/') {
+        libso = get_real_path(argv[0], NULL);
+        if (!libso) {
+            print_error("Error: Failed to get real path.");
+            __exit(1);
+        }
+    } else {
+        libso = argv[0];
     }
 
     prefix_len = sizeof(LD_PRELOAD_PREFIX) - 1;
