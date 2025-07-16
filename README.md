@@ -13,7 +13,7 @@ Enhanced Readline with fzf-powered hooks
 
 ## Build
 ```sh
-make all
+make
 ```
 
 ## Usage
@@ -22,7 +22,7 @@ LD_PRELOAD=/your/path/readline_fzf_hook.so your_program
 ```
 or (only support in `x86_64`)
 ```sh
-/your/path/readline_fzf_hook.so /your/path/your_program
+/your/path/readline_fzf_hook.so your_program
 ```
 
 ## Limitations

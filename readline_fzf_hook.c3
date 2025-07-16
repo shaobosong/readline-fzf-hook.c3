@@ -1,4 +1,4 @@
-module readline_fzf_hook;
+module readline_fzf_hook @private;
 
 import std::collections;
 import std::io;
@@ -91,7 +91,9 @@ macro String[] cstrings_to_strings(int count, char** cstrs) @private
     return list;
 }
 
-fn String? get_fzf_result(String[] extra_fzf_args, String[] choices, String query)
+fn String? get_fzf_result(String[] extra_fzf_args,
+                          String[] choices,
+                          String query)
 {
     ListStr fzf_args;
 
@@ -326,26 +328,6 @@ fn void restore_completion_variable_symbols()
     // *rl_completion_entry_function_ptr = rl_completion_entry_function_val;
 }
 
-fn int rl_complete(int ignore, int invoking_key) @export("rl_complete")
-{
-    resolve_completion_function_symbols();
-    resolve_completion_variable_symbols();
-    defer restore_completion_variable_symbols();
-
-    /* Complete the word at or before point.
-       WHAT_TO_DO says what to do with the completion.
-       `?' means list the possible completions.
-       TAB means do standard completion.
-       `*' means insert all of the possible completions.
-       `!' means to do standard completion, and list all possible completions if
-       there is more than one.
-       `@' means to do standard completion, and list all possible completions if
-       there is more than one and partial completion is not possible.
-       `$' implements a protocol for exporting completions and information about
-       what is being completed to another process via rl_outstream. */
-    return original_rl_complete ? original_rl_complete(ignore, invoking_key) : 0;
-}
-
 fn void resolve_search_history_function_symbols()
 {
     @resolve_text_sym(original_history_list, history_list);
@@ -375,16 +357,13 @@ fn void update_readline_text(String new_text)
     }
 }
 
-fn int rl_reverse_search_history (int sign, int key) @export("rl_reverse_search_history")
+fn int reverse_search_history_internal ()
 {
     int i;
     Hist_entry** hlist;
     ListStr choices;
     String line_text;
     String? selected;
-
-    resolve_search_history_function_symbols();
-    resolve_search_history_variable_symbols();
 
     line_text = (String)rl_line_buffer_val[:cstring_strlen(rl_line_buffer_val)];
 
@@ -413,4 +392,35 @@ fn int rl_reverse_search_history (int sign, int key) @export("rl_reverse_search_
     update_readline_text(selected);
 
     return 0;
+}
+module readline_fzf_hook;
+import std::io;
+import std::os;
+
+fn int rl_complete(int ignore, int invoking_key) @export("rl_complete")
+{
+    resolve_completion_function_symbols();
+    resolve_completion_variable_symbols();
+    defer restore_completion_variable_symbols();
+
+    /* Complete the word at or before point.
+       WHAT_TO_DO says what to do with the completion.
+       `?' means list the possible completions.
+       TAB means do standard completion.
+       `*' means insert all of the possible completions.
+       `!' means to do standard completion, and list all possible completions if
+       there is more than one.
+       `@' means to do standard completion, and list all possible completions if
+       there is more than one and partial completion is not possible.
+       `$' implements a protocol for exporting completions and information about
+       what is being completed to another process via rl_outstream. */
+    return original_rl_complete ? original_rl_complete(ignore, invoking_key) : 0;
+}
+
+fn int rl_reverse_search_history (int sign, int key) @export("rl_reverse_search_history")
+{
+    resolve_search_history_function_symbols();
+    resolve_search_history_variable_symbols();
+
+    return reverse_search_history_internal();
 }
