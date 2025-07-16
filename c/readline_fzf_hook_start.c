@@ -15,34 +15,42 @@
 #include "entry_arch.h"
 #include "syscall_arch.h"
 
+#define CONCAT_I(a, b) a ## b
+#define CONCAT(a, b) CONCAT_I(a, b)
+
+#define _GET_NTH_ARG(_1, _2, _3, _4, _5, _6, _7, N, ...) N
+#define COUNT_ARGS(...) _GET_NTH_ARG(__VA_ARGS__, 6, 5, 4, 3, 2, 1, 0)
+
+#define do_syscall(...) CONCAT(do_syscall_, COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__)
+
 hidden void __exit(int status)
 {
-    do_syscall_1(__NR_exit, status);
+    do_syscall(__NR_exit, status);
     assert(0);
 }
 
 hidden long _getcwd(char *buf, unsigned long size) {
-    return do_syscall_2(__NR_getcwd, (long)buf, size);
+    return do_syscall(__NR_getcwd, (long)buf, size);
 }
 
 hidden void *_mmap(size_t length)
 {
-    return (void *)do_syscall_6(__NR_mmap, 0, length, PROT_READ | PROT_WRITE,
-                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    return (void *)do_syscall(__NR_mmap, 0, length, PROT_READ | PROT_WRITE,
+                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 }
 
 hidden int _munmap(void *addr, size_t length) {
-    return (int)do_syscall_2(__NR_munmap, (long)addr, length);
+    return (int)do_syscall(__NR_munmap, (long)addr, length);
 }
 
 hidden int _execve(char *path, char *const argv[], char *const envp[])
 {
-    return (int)do_syscall_3(__NR_execve, (long)path, (long)argv, (long)envp);
+    return (int)do_syscall(__NR_execve, (long)path, (long)argv, (long)envp);
 }
 
 hidden long _write(int fd, const char *buf, size_t count)
 {
-    return do_syscall_3(__NR_write, fd, (long)buf, count);
+    return do_syscall(__NR_write, fd, (long)buf, count);
 }
 
 hidden size_t strlen_custom(const char *s)
