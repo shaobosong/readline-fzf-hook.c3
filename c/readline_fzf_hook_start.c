@@ -114,7 +114,6 @@ hidden char *get_real_path(const char *path, char *real_path)
     char *rp1, *rp2;
     const char *p1, *p2;
     char buf[PATH_MAX];
-    int n;
 
     if (path == NULL) {
         return NULL;
@@ -178,15 +177,14 @@ hidden char *get_real_path(const char *path, char *real_path)
     *rp2 = 0;
 
     if (real_path == NULL) {
-        n = rp2 - rp1 + 1;
-        rp1 = _mmap(n);
-        if (rp1 == NULL) {
+        real_path = _mmap(rp2 - rp1 + 1);
+        if (real_path == NULL) {
             return NULL;
         }
-        memcpy_custom(rp1, buf, n);
+        memcpy_custom(real_path, buf, rp2 - rp1 + 1);
     }
 
-    return rp1;
+    return real_path;
 }
 
 hidden void readline_fzf_hook_start_c(size_t *sp, size_t *dynv)
