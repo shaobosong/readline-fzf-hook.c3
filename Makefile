@@ -1,5 +1,5 @@
 CC := $(shell command -v gcc || command -v clang 2>/dev/null)
-CFLAGS = -std=c99 -Wall -g -O0 -ffunction-sections -fdata-sections -fPIC
+CFLAGS = -std=c99 -Wall -g -O2 -ffunction-sections -fdata-sections -fPIC
 C3_LDFLAGS =
 
 ARCH := $(shell uname -m)
