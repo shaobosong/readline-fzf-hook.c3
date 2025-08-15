@@ -221,12 +221,22 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
     // Get the line text in line editor
     line_text = (String)rl_line_buffer_val[:cstring_strlen(rl_line_buffer_val)];
 
+    // > example:xxxxx
+    //           |
+    //        <start>: Need insert a delimiter before the completed word
+    String delim = " ";
+    if (start != 0 && line_text[start - 1] != delim[0]) {
+        line_text = line_text[0:start].tcopy().tconcat(delim).tconcat(line_text[start..].tcopy());
+        start = start + 1;
+        end = end + 1;
+    }
+
     // Get index of the field under completion in the space-separated string
-    nth = line_text[0:start].count(" ") + 1;
+    nth = line_text[0:start].count(delim) + 1;
 
     // Run FZF
     extra_fzf_args.tinit_with_array({
-        "--delimiter= ",
+        string::tformat("--delimiter=%s", delim),
         string::tformat("--accept-nth={%d}", nth)
     });
     if (FZF_ONLY_LIST_COMPLETION_FIELD) {
