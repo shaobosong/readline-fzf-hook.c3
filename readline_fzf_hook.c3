@@ -98,7 +98,7 @@ fn String? get_fzf_result(String[] extra_fzf_args,
     ListStr fzf_args;
 
     fzf_args.tinit_with_array(FZF_ARGS);
-    fzf_args.add_array(extra_fzf_args);
+    fzf_args.push_all(extra_fzf_args);
     fzf_args.push(string::tformat("--query=%s", query));
 
     SubProcess proc = process::create(fzf_args.to_tarray(), {
