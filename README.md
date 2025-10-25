@@ -6,7 +6,7 @@ Enhanced Readline with fzf-powered hooks
 - Search history(`C-r`)
 
 ## Requirements
-- [c3c](https://github.com/c3lang/c3c)(v0.7.2)
+- [c3c](https://github.com/c3lang/c3c)(v0.7.6)
 - make
 - fzf
 - `gcc` or `clang` (optional)
