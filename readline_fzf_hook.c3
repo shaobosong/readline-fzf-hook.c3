@@ -252,7 +252,7 @@ fn char **fzf_attempted_completion_callback(char *ctext, int start, int end)
         }
     }
 
-    quicksort(choices, &cmp_string);
+    quicksort(&choices, &cmp_string);
 
     selected = get_fzf_result(extra_fzf_args.to_tarray(), choices.to_tarray(), text);
     if (catch excuse = selected) {
